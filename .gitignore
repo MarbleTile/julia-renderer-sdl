@@ -53,3 +53,7 @@ dkms.conf
 
 # Local
 jul
+gltest.c
+gltest
+include
+gl.c

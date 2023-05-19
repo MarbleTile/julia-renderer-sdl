@@ -8,7 +8,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdbool.h>
-#include <inttypes.h>
 #include <SDL2/SDL.h>
 #include <stdlib.h>
 #include <math.h>
@@ -85,6 +84,7 @@ u32 lerp_u32(u32 v0, u32 v1, f32 t){
     return (1-t) * v0 + t * v1;
 }
 
+//maybe go in for a SIGMOID! ! ! ! 
 //k->w fine; w->k fucked up
 u32 sqerp_u32(u32 v0, u32 v1, f32 t){
     return (v1-v0)*sqrtf(t) + v0;
@@ -110,36 +110,57 @@ void gen_color(u32 *colors, u32 begin, u32 end){
         colors[i] = end;
 }
 
+//void draw_julia(const cpx con, u32 *colors, const f32 zoom, const cpx pos){
+//    cpx z = {0.0, 0.0};
+//    u32 it = 0;
+//    u32 smooth_it = 0;
+//    const f32 esc = 2.0;
+//    const f32 R = esc * esc;
+//    const u32 samples = 16;
+//    const f32 jigg = 0.001;
+//    srand(time(NULL));
+//    for(u32 x = 0; x < SCREEN_WIDTH; x++){
+//        for(u32 y = 0; y < SCREEN_HEIGHT; y++){
+//            for(u32 s = 0; s < samples; s++){
+//                z.r = lerp_f32(-1*esc/zoom - pos.r, 
+//                        esc/zoom - pos.r - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
+//                        (f32) x/SCREEN_WIDTH);
+//                z.i = lerp_f32(-1*esc/zoom - pos.i, 
+//                        esc/zoom - pos.i - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
+//                        (f32) y/SCREEN_HEIGHT);
+//                //z.r = lerp_f32(-1*esc/zoom - pos.r, esc/zoom - pos.r, (f32) x/SCREEN_WIDTH);
+//                //z.i = lerp_f32(-1*esc/zoom - pos.i, esc/zoom - pos.i, (f32) y/SCREEN_HEIGHT);
+//                it = 0; 
+//                while(cpx_mag(z) < R && it < MAX_ITERATION){
+//                    z = cpx_next(z, con);
+//                    it++;
+//                }
+//               smooth_it += it;
+//            }
+//            state.pixels[y*SCREEN_WIDTH + x] = colors[smooth_it/samples]; 
+//            //state.pixels[y*SCREEN_WIDTH + x] = colors[it];
+//            smooth_it = 0;
+//        }
+//    }
+//}
+
+
 void draw_julia(const cpx con, u32 *colors, const f32 zoom, const cpx pos){
     cpx z = {0.0, 0.0};
     u32 it = 0;
-    u32 smooth_it = 0;
     const f32 esc = 2.0;
     const f32 R = esc * esc;
-    const u32 samples = 16;
-    const f32 jigg = 0.001;
     srand(time(NULL));
     for(u32 x = 0; x < SCREEN_WIDTH; x++){
         for(u32 y = 0; y < SCREEN_HEIGHT; y++){
-            for(u32 s = 0; s < samples; s++){
-                z.r = lerp_f32(-1*esc/zoom - pos.r, 
-                        esc/zoom - pos.r - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
-                        (f32) x/SCREEN_WIDTH);
-                z.i = lerp_f32(-1*esc/zoom - pos.i, 
-                        esc/zoom - pos.i - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
-                        (f32) y/SCREEN_HEIGHT);
-                //z.r = lerp_f32(-1*esc/zoom - pos.r, esc/zoom - pos.r, (f32) x/SCREEN_WIDTH);
-                //z.i = lerp_f32(-1*esc/zoom - pos.i, esc/zoom - pos.i, (f32) y/SCREEN_HEIGHT);
-                it = 0; 
-                while(cpx_mag(z) < R && it < MAX_ITERATION){
-                    z = cpx_next(z, con);
-                    it++;
-                }
-               smooth_it += it;
+            z.r = lerp_f32(-1*esc/zoom - pos.r, esc/zoom - pos.r, (f32) x/SCREEN_WIDTH);
+            z.i = lerp_f32(-1*esc/zoom - pos.i, esc/zoom - pos.i, (f32) y/SCREEN_HEIGHT);
+            it = 0; 
+            while(cpx_mag(z) < R && it < MAX_ITERATION){
+                z = cpx_next(z, con);
+                it++;
             }
-            state.pixels[y*SCREEN_WIDTH + x] = colors[smooth_it/samples]; 
-            //state.pixels[y*SCREEN_WIDTH + x] = colors[it];
-            smooth_it = 0;
+            state.pixels[y*SCREEN_WIDTH + x] = colors[it];
         }
     }
 }
@@ -153,7 +174,7 @@ void translate(f32 x, f32 y, u32 *x_o, u32 *y_o){
 void init_state(void){ 
     state.window = SDL_CreateWindow("FRACTAL VIEWER 9000", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 
         SCREEN_WIDTH, SCREEN_HEIGHT, SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_RESIZABLE); //| SDL_WINDOW_FULLSCREEN);
-    state.renderer = SDL_CreateRenderer(state.window, -1, SDL_RENDERER_PRESENTVSYNC);
+    state.renderer = SDL_CreateRenderer(state.window, -1, SDL_RENDERER_PRESENTVSYNC | SDL_RENDERER_ACCELERATED);
     state.texture = SDL_CreateTexture(state.renderer, SDL_PIXELFORMAT_ABGR8888, SDL_TEXTUREACCESS_STREAMING, 
         SCREEN_WIDTH, SCREEN_HEIGHT);
     state.quit = false;

@@ -7,6 +7,9 @@ all: jul
 jul: main.c
 	$(CC) $(CFLAGS) $< -o jul
 
+gltest: gltest.c gl.c
+	$(CC) $(CFLAGS) -lGL -Iinclude $< -o gltest
+
 debug: main.c
 	$(CC) $(CFLAGS) -g $< -o jul
 
