@@ -93,7 +93,7 @@ u32 sqerp_u32(u32 v0, u32 v1, f32 t){
 }
 
 //0xAA_BB_GG_RR
-void gen_color(u32 *colors, u32 begin, u32 end){
+void gen_color_naive(u32 *colors, u32 begin, u32 end){
     const u32 r_b =  0x000000FF & begin;
     const u32 g_b = (0x0000FF00 & begin) >> 8;
     const u32 b_b = (0x00FF0000 & begin) >> 16;
@@ -112,35 +112,75 @@ void gen_color(u32 *colors, u32 begin, u32 end){
         colors[i] = end;
 }
 
-//void draw_julia(const cpx con, u32 *colors, const f32 zoom, const cpx pos){
-//    cpx z = {0.0, 0.0};
-//    u32 it = 0;
-//    u32 smooth_it = 0;
-//    const f32 esc = 2.0;
-//    const f32 R = esc * esc;
-//    const u32 samples = 16;
-//    const f32 jigg = 0.001;
-//    for(u32 x = 0; x < SCREEN_WIDTH; x++){
-//        for(u32 y = 0; y < SCREEN_HEIGHT; y++){
-//            for(u32 s = 0; s < samples; s++){
-//                z.r = lerp_f32(-1*esc/zoom - pos.r, 
-//                        esc/zoom - pos.r - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
-//                        (f32) x/SCREEN_WIDTH);
-//                z.i = lerp_f32(-1*esc/zoom - pos.i, 
-//                        esc/zoom - pos.i - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
-//                        (f32) y/SCREEN_HEIGHT);
-//                it = 0; 
-//                while(cpx_mag(z) < R && it < MAX_ITERATION){
-//                    z = cpx_next(z, con);
-//                    it++;
-//                }
-//               smooth_it += it;
-//            }
-//            state.pixels[y*SCREEN_WIDTH + x] = colors[smooth_it/samples]; 
-//            smooth_it = 0;
-//        }
-//    }
+//0xAA_BB_GG_RR
+void gen_color(u32 *colors, u32 begin, u32 end){
+    const u32 r_b_u32 =  0x000000FF & begin;
+    const u32 g_b_u32 = (0x0000FF00 & begin) >> 8;
+    const u32 b_b_u32 = (0x00FF0000 & begin) >> 16;
+    const u32 r_e_u32 =  0x000000FF & end;
+    const u32 g_e_u32 = (0x0000FF00 & end) >> 8;
+    const u32 b_e_u32 = (0x00FF0000 & end) >> 16;
+    f32 r_b_norm = (f32) r_b_u32/255;
+    f32 g_b_norm = (f32) g_b_u32/255;
+    f32 b_b_norm = (f32) b_b_u32/255;
+    f32 r_e_norm = (f32) r_e_u32/255;
+    f32 g_e_norm = (f32) g_e_u32/255;
+    f32 b_e_norm = (f32) b_e_u32/255;
+    
+    f32 mix;
+    for(u32 i = 0; i < MAX_ITERATION; i++){
+        mix = (f32) i / (f32) MAX_ITERATION;
+        f32 r_f32 = lerp_f32(r_b_norm, r_e_norm, mix);
+        f32 b_f32 = lerp_f32(b_b_norm, b_e_norm, mix);
+        f32 g_f32 = lerp_f32(g_b_norm, g_e_norm, mix);
+        u32 r = lerp_u32(0, 255, r_f32);
+        u32 g = lerp_u32(0, 255, g_f32);
+        u32 b = lerp_u32(0, 255, b_f32);
+        colors[i] = 0xFF << 24 | b << 16 | g << 8 | r;
+    }
+}
+
+//void gen_color_new(u32 *colors, u32 begin, u32 end){
+//    const u32 r_b =  0x000000FF & begin;
+//    const u32 g_b = (0x0000FF00 & begin) >> 8;
+//    const u32 b_b = (0x00FF0000 & begin) >> 16;
+//    const u32 r_e =  0x000000FF & end;
+//    const u32 g_e = (0x0000FF00 & end) >> 8;
+//    const u32 b_e = (0x00FF0000 & end) >> 16;
+//    f32 r_s = (f32) (r_e - r_b) / (f32) MAX_ITERATION;
+//    f32 g_s = (f32) (g_e - g_b) / (f32) MAX_ITERATION;
+//    f32 b_s = (f32) (b_e - b_b) / (f32) MAX_ITERATION;
 //}
+
+void draw_julia_aa(const cpx con, u32 *colors, const f32 zoom, const cpx pos){
+    cpx z = {0.0, 0.0};
+    u32 it = 0;
+    u32 smooth_it = 0;
+    const f32 esc = 2.0;
+    const f32 R = esc * esc;
+    const u32 samples = 16;
+    const f32 jigg = 0.001;
+    for(u32 x = 0; x < SCREEN_WIDTH; x++){
+        for(u32 y = 0; y < SCREEN_HEIGHT; y++){
+            for(u32 s = 0; s < samples; s++){
+                z.r = lerp_f32(-1*esc/zoom - pos.r, 
+                        esc/zoom - pos.r - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
+                        (f32) x/SCREEN_WIDTH);
+                z.i = lerp_f32(-1*esc/zoom - pos.i, 
+                        esc/zoom - pos.i - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
+                        (f32) y/SCREEN_HEIGHT);
+                it = 0; 
+                while(cpx_mag(z) < R && it < MAX_ITERATION){
+                    z = cpx_next(z, con);
+                    it++;
+                }
+               smooth_it += it;
+            }
+            state.pixels[y*SCREEN_WIDTH + x] = colors[smooth_it/samples]; 
+            smooth_it = 0;
+        }
+    }
+}
 
 
 void draw_julia(const cpx con, u32 *colors, const f32 zoom, const cpx pos){
@@ -175,37 +215,37 @@ typedef struct thread_args_t{
     u32 y_end;
 } thread_args_t;
 
-//void* draw_jul_thread(void* args){
-//    thread_args_t* a = (thread_args_t*) args;
-//    cpx z = {0.0, 0.0};
-//    u32 it = 0;
-//    u32 smooth_it = 0;
-//    const f32 esc = 2.0;
-//    const f32 R = esc * esc;
-//    const u32 samples = 8;
-//    const f32 jigg = 0.001;
-//    for(u32 x = a->x_begin; x < a->x_end; x++){
-//        for(u32 y = a->y_begin; y < a->y_end; y++){
-//            for(u32 s = 0; s < samples; s++){
-//                z.r = lerp_f32(-1*esc/a->zoom - a->pos.r, 
-//                        esc/a->zoom - a->pos.r - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX),
-//                        (f32) x/SCREEN_WIDTH);
-//                z.i = lerp_f32(-1*esc/a->zoom - a->pos.i, 
-//                        esc/a->zoom - a->pos.i - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX),
-//                        (f32) y/SCREEN_HEIGHT);
-//                it = 0;
-//                while(cpx_mag(z) < R && it < MAX_ITERATION){
-//                    z = cpx_next(z, a->con);
-//                    it++;
-//                }
-//                smooth_it += it;
-//            }
-//            a->pixels[y*SCREEN_WIDTH + x] = a->colors[smooth_it/samples];
-//            smooth_it = 0;
-//        }
-//    }
-//    return NULL;
-//}
+void* draw_jul_thread_aa(void* args){
+    thread_args_t* a = (thread_args_t*) args;
+    cpx z = {0.0, 0.0};
+    u32 it = 0;
+    u32 smooth_it = 0;
+    const f32 esc = 2.0;
+    const f32 R = esc * esc;
+    const u32 samples = 8;
+    const f32 jigg = 0.001;
+    for(u32 x = a->x_begin; x < a->x_end; x++){
+        for(u32 y = a->y_begin; y < a->y_end; y++){
+            for(u32 s = 0; s < samples; s++){
+                z.r = lerp_f32(-1*esc/a->zoom - a->pos.r, 
+                        esc/a->zoom - a->pos.r - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX),
+                        (f32) x/SCREEN_WIDTH);
+                z.i = lerp_f32(-1*esc/a->zoom - a->pos.i, 
+                        esc/a->zoom - a->pos.i - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX),
+                        (f32) y/SCREEN_HEIGHT);
+                it = 0;
+                while(cpx_mag(z) < R && it < MAX_ITERATION){
+                    z = cpx_next(z, a->con);
+                    it++;
+                }
+                smooth_it += it;
+            }
+            a->pixels[y*SCREEN_WIDTH + x] = a->colors[smooth_it/samples];
+            smooth_it = 0;
+        }
+    }
+    return NULL;
+}
 
 void* draw_jul_thread(void* args){
     thread_args_t* a = (thread_args_t*) args;
