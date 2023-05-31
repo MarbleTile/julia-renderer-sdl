@@ -13,6 +13,8 @@
 #include <math.h>
 #include <time.h>
 
+#include <pthread.h>
+
 //#define SCREEN_WIDTH 1280
 //#define SCREEN_HEIGHT 720
 #define SCREEN_WIDTH 1000
@@ -118,7 +120,6 @@ void gen_color(u32 *colors, u32 begin, u32 end){
 //    const f32 R = esc * esc;
 //    const u32 samples = 16;
 //    const f32 jigg = 0.001;
-//    srand(time(NULL));
 //    for(u32 x = 0; x < SCREEN_WIDTH; x++){
 //        for(u32 y = 0; y < SCREEN_HEIGHT; y++){
 //            for(u32 s = 0; s < samples; s++){
@@ -128,8 +129,6 @@ void gen_color(u32 *colors, u32 begin, u32 end){
 //                z.i = lerp_f32(-1*esc/zoom - pos.i, 
 //                        esc/zoom - pos.i - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX), 
 //                        (f32) y/SCREEN_HEIGHT);
-//                //z.r = lerp_f32(-1*esc/zoom - pos.r, esc/zoom - pos.r, (f32) x/SCREEN_WIDTH);
-//                //z.i = lerp_f32(-1*esc/zoom - pos.i, esc/zoom - pos.i, (f32) y/SCREEN_HEIGHT);
 //                it = 0; 
 //                while(cpx_mag(z) < R && it < MAX_ITERATION){
 //                    z = cpx_next(z, con);
@@ -138,7 +137,6 @@ void gen_color(u32 *colors, u32 begin, u32 end){
 //               smooth_it += it;
 //            }
 //            state.pixels[y*SCREEN_WIDTH + x] = colors[smooth_it/samples]; 
-//            //state.pixels[y*SCREEN_WIDTH + x] = colors[it];
 //            smooth_it = 0;
 //        }
 //    }
@@ -165,6 +163,70 @@ void draw_julia(const cpx con, u32 *colors, const f32 zoom, const cpx pos){
     }
 }
 
+typedef struct thread_args_t{
+    u32 *pixels;
+    cpx con;
+    u32 *colors;
+    f32 zoom;
+    cpx pos;
+    u32 x_begin; // [*_begin, *_end)
+    u32 x_end;
+    u32 y_begin;
+    u32 y_end;
+} thread_args_t;
+
+//void* draw_jul_thread(void* args){
+//    thread_args_t* a = (thread_args_t*) args;
+//    cpx z = {0.0, 0.0};
+//    u32 it = 0;
+//    u32 smooth_it = 0;
+//    const f32 esc = 2.0;
+//    const f32 R = esc * esc;
+//    const u32 samples = 8;
+//    const f32 jigg = 0.001;
+//    for(u32 x = a->x_begin; x < a->x_end; x++){
+//        for(u32 y = a->y_begin; y < a->y_end; y++){
+//            for(u32 s = 0; s < samples; s++){
+//                z.r = lerp_f32(-1*esc/a->zoom - a->pos.r, 
+//                        esc/a->zoom - a->pos.r - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX),
+//                        (f32) x/SCREEN_WIDTH);
+//                z.i = lerp_f32(-1*esc/a->zoom - a->pos.i, 
+//                        esc/a->zoom - a->pos.i - lerp_f32(-1*jigg, jigg, (f32) rand() / (f32) RAND_MAX),
+//                        (f32) y/SCREEN_HEIGHT);
+//                it = 0;
+//                while(cpx_mag(z) < R && it < MAX_ITERATION){
+//                    z = cpx_next(z, a->con);
+//                    it++;
+//                }
+//                smooth_it += it;
+//            }
+//            a->pixels[y*SCREEN_WIDTH + x] = a->colors[smooth_it/samples];
+//            smooth_it = 0;
+//        }
+//    }
+//    return NULL;
+//}
+
+void* draw_jul_thread(void* args){
+    thread_args_t* a = (thread_args_t*) args;
+    cpx z = {0.0, 0.0};
+    u32 it = 0;
+    const f32 esc = 2.0;
+    const f32 R = esc * esc;
+    for(u32 x = a->x_begin; x < a->x_end; x++){
+        for(u32 y = a->y_begin; y < a->y_end; y++){
+            z.r = lerp_f32(-1*esc/a->zoom - a->pos.r, esc/a->zoom - a->pos.r, (f32) x/SCREEN_WIDTH);
+            z.i = lerp_f32(-1*esc/a->zoom - a->pos.i, esc/a->zoom - a->pos.i, (f32) y/SCREEN_HEIGHT);
+            it = 0;
+            while(cpx_mag(z) < R && it < MAX_ITERATION){
+                z = cpx_next(z, a->con);
+                it++;
+            }
+            a->pixels[y*SCREEN_WIDTH + x] = a->colors[it];
+        }
+    }
+    return NULL;
+}
 
 void translate(f32 x, f32 y, u32 *x_o, u32 *y_o){
     *x_o = x * SCREEN_WIDTH;
@@ -209,13 +271,20 @@ int main (int argc, char **argv){
 
     u32 color_begin = BLACK;
     u32 color_end   = WHITE;
+    u32 num_thread  = 0;
+
     
-    if(argc > 3)
+    if(argc > 4)
         exit(1);
 
-    if(argc == 3){
-        color_begin = handle_cli(argv[1][0]);
-        color_end   = handle_cli(argv[2][0]);
+    if(argc > 1)
+        num_thread = atoi(argv[1]);
+    else
+        num_thread = 8;
+
+    if(argc == 4){
+        color_begin = handle_cli(argv[2][0]);
+        color_end   = handle_cli(argv[3][0]);
     }
 
     memset(&state, 0, sizeof(state));
@@ -231,15 +300,25 @@ int main (int argc, char **argv){
     const cpx neat_julia = {-0.8, 0.156};
     //draw_julia(neat_julia, colors);
 
-//    SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, 1);
     const f32 d_zoom = 0.5;
     const f32 d_pos = 0.1;
     cpx pos = {0.0, 0.0};
     f32 zoom = 1.0;
     cpx con = {-1.0, -0.5};
+    
+    pthread_t threads[num_thread];
+    thread_args_t thread_args[num_thread];
+    for(u32 i=0; i<num_thread; i++){
+        thread_args[i] = (thread_args_t) {&(state.pixels[0]), neat_julia, colors, zoom, pos, 0, SCREEN_WIDTH, 
+            i*SCREEN_HEIGHT/num_thread, (i+1)*SCREEN_HEIGHT/num_thread}; 
+    }
+
     while (!state.quit){
 //        draw_julia(con, colors, zoom, pos);
-        draw_julia(neat_julia, colors, zoom, pos);
+        for(u32 i=0; i<num_thread; i++)
+            pthread_create(&threads[i], NULL, draw_jul_thread, (void *) &thread_args[i]);
+        for(u32 i=0; i<num_thread; i++)
+            pthread_join(threads[i], NULL);
 
         SDL_UpdateTexture(state.texture, NULL, state.pixels, SCREEN_WIDTH*4);
         SDL_RenderCopyEx(state.renderer, state.texture, NULL, NULL, 0.0, NULL, SDL_FLIP_VERTICAL);
@@ -277,6 +356,11 @@ int main (int argc, char **argv){
                 default:
                     continue;
             }
+        }
+        
+        for(u32 i=0; i<num_thread; i++){
+            thread_args[i].pos = pos;
+            thread_args[i].zoom = zoom;
         }
         con.r   += 0.001;
         con.i   += 0.001;
